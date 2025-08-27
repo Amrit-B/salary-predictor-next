@@ -1,40 +1,53 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/pages/api-reference/create-next-app).
+Career Insights AI Salary Predictor
 
-## Getting Started
+Ever wonder what you should really be earning? This app gives you a realistic salary prediction for any job you can think of and then uses AI to give you some solid career advice.
 
-First, run the development server:
+It's built with the Google Gemini API to go beyond simple, static calculators. Instead of a fixed list of jobs, it can figure out a salary model for pretty much anything on the fly.
+✨ What It Does
 
-```bash
+    Predicts Your Salary (for real): Just type in a job title and your years of experience. The app uses AI to figure out a realistic salary range. No more guessing.
+
+    Gives You AI-Powered Career Tips: Once you have your salary, you can ask for career insights. It'll give you a quick rundown of industry trends, skills you should be working on, and what your next career move could be.
+
+    Clean, Modern UI: Built with Next.js and Tailwind CSS, so it's fast, looks good, and works great on your phone.
+
+    Keeps Your Keys Safe: Your Gemini API key is kept secure on the backend. It's never exposed to the browser.
+
+🚀 How It Works
+
+Under the hood, this app has a smart way of getting its data.
+
+    When you type in a job title, the app doesn't just look it up in a list. It sends the title to a secure backend API.
+
+    The backend then asks the Gemini Pro model a specific question: "For a job like 'Underwater Welder', what's a typical starting salary and annual raise?"
+
+    To make sure the answers don't wildly change every time, it tells the AI to be more factual and less "creative" by setting a low temperature.
+
+    The AI gives the backend a starting salary and a yearly raise number.
+
+    The app then uses those two numbers, along with your years of experience, to calculate and show you the final prediction.
+
+🛠️ Get It Running Locally
+
+Want to run it yourself? Here’s how:
+
+1. Clone the repo:
+
+git clone https://github.com/Amrit-B/salary-predictor-next.git
+cd salary-predictor-next
+
+2. Install the dependencies:
+
+npm install
+
+3. Set up your environment variables:
+
+Create a file named .env.local in the main project folder and drop in your Google Gemini API key:
+
+GEMINI_API_KEY=YOUR_API_KEY_HERE
+
+4. Start the development server:
+
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
-
-You can start editing the page by modifying `pages/index.js`. The page auto-updates as you edit the file.
-
-[API routes](https://nextjs.org/docs/pages/building-your-application/routing/api-routes) can be accessed on [http://localhost:3000/api/hello](http://localhost:3000/api/hello). This endpoint can be edited in `pages/api/hello.js`.
-
-The `pages/api` directory is mapped to `/api/*`. Files in this directory are treated as [API routes](https://nextjs.org/docs/pages/building-your-application/routing/api-routes) instead of React pages.
-
-This project uses [`next/font`](https://nextjs.org/docs/pages/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn-pages-router) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/pages/building-your-application/deploying) for more details.
+Now you can open http://localhost:3000 in your browser and see it in action.
