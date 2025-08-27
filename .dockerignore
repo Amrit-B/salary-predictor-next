@@ -1,0 +1,14 @@
+# Environment variables
+.env.local
+
+# Node modules (these will be installed inside the container)
+node_modules
+
+# Next.js build output
+.next
+
+# Git folder
+.git
+
+# Documentation
+README.md

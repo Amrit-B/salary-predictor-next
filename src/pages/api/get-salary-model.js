@@ -25,7 +25,7 @@ export default async function handler(request, response) {
       Do not include any other text, explanation, or markdown formatting.
     `;
 
-    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite-preview-06-17:generateContent?key=${apiKey}`;
     
     const payload = {
       contents: [{
