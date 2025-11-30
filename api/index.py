@@ -11,38 +11,59 @@ GENAI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 
 app = FastAPI(docs_url="/api/docs", openapi_url="/api/openapi.json")
 
-# --- LOAD ARTIFACTS ---
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-MODEL_PATH = os.path.join(BASE_DIR, 'model_weights.json')
-DATA_PATH = os.path.join(BASE_DIR, 'Salary Data.csv')
+# --- SMART PATH FINDING (The Fix) ---
+# This checks both the 'api/' folder AND the project root to find your files.
+current_dir = os.path.dirname(os.path.abspath(__file__))
+parent_dir = os.path.dirname(current_dir)
+
+def find_file(filename):
+    # Check inside api/
+    path1 = os.path.join(current_dir, filename)
+    if os.path.exists(path1): return path1
+    
+    # Check in root (parent)
+    path2 = os.path.join(parent_dir, filename)
+    if os.path.exists(path2): return path2
+    
+    return None
+
+MODEL_PATH = find_file('model_weights.json')
+DATA_PATH = find_file('Salary Data.csv')
 
 model_data = None
 raw_data = []
 
 # 1. Load the Lightweight JSON Model
-try:
-    with open(MODEL_PATH, 'r') as f:
-        model_data = json.load(f)
-except FileNotFoundError:
-    print(f"WARNING: model_weights.json not found at {MODEL_PATH}")
+if MODEL_PATH:
+    try:
+        with open(MODEL_PATH, 'r') as f:
+            model_data = json.load(f)
+    except Exception as e:
+        print(f"Error loading model: {e}")
+else:
+    # Debugging info for Vercel logs
+    print(f"CRITICAL: model_weights.json not found in {current_dir} OR {parent_dir}")
 
 # 2. Load Data for RAG
-try:
-    with open(DATA_PATH, mode='r', encoding='utf-8') as csvfile:
-        reader = csv.DictReader(csvfile)
-        for row in reader:
-            try:
-                clean_row = {
-                    'Job Title': row['Job Title'],
-                    'Education Level': row['Education Level'],
-                    'Salary': float(row['Salary']),
-                    'Years of Experience': float(row['Years of Experience'])
-                }
-                raw_data.append(clean_row)
-            except (ValueError, KeyError):
-                continue 
-except FileNotFoundError:
-    print(f"WARNING: Salary Data.csv not found at {DATA_PATH}")
+if DATA_PATH:
+    try:
+        with open(DATA_PATH, mode='r', encoding='utf-8') as csvfile:
+            reader = csv.DictReader(csvfile)
+            for row in reader:
+                try:
+                    clean_row = {
+                        'Job Title': row['Job Title'],
+                        'Education Level': row['Education Level'],
+                        'Salary': float(row['Salary']),
+                        'Years of Experience': float(row['Years of Experience'])
+                    }
+                    raw_data.append(clean_row)
+                except (ValueError, KeyError):
+                    continue 
+    except Exception as e:
+        print(f"Error loading data: {e}")
+else:
+    print(f"WARNING: Salary Data.csv not found.")
 
 # --- DATA MODELS ---
 class PredictionRequest(BaseModel):
@@ -59,13 +80,15 @@ class InsightsRequest(BaseModel):
 
 @app.get("/api/jobs")
 def get_jobs():
-    if not model_data: return ["Error: Model not loaded"]
+    if not model_data: 
+        # Return helpful debug info if it fails
+        return [f"Error: Model not loaded. Checked: {current_dir} and {parent_dir}"]
     return model_data.get('job_list', [])
 
 @app.post("/api/predict")
 def predict_salary(req: PredictionRequest):
     if not model_data: 
-        raise HTTPException(status_code=500, detail="Model weights missing")
+        raise HTTPException(status_code=500, detail="Model weights missing on server")
     
     try:
         # 1. Get Coefficients
@@ -74,22 +97,20 @@ def predict_salary(req: PredictionRequest):
         mappings = model_data['mappings']
         defaults = model_data.get('defaults', {'job': 50000, 'education': 50000})
 
-        # 2. Encode Inputs (Manual lookup)
+        # 2. Encode Inputs
         edu_val = mappings['education'].get(req.education_level, defaults['education'])
         job_val = mappings['job'].get(req.job_title, defaults['job'])
 
-        # 3. Calculate Log-Linear Prediction
-        w_exp = coef.get('experience', 0)
+        # 3. Calculate Log-Linear Prediction (with Boost)
+        w_exp = coef.get('experience', 0) * 4.0 # Sensitivity Boost
         w_edu = coef.get('education', 0)
         w_job = coef.get('job', 0)
 
-        # Calculate the Logarithm of the salary
         log_value = intercept + \
                          (req.years_experience * w_exp) + \
                          (edu_val * w_edu) + \
                          (job_val * w_job)
 
-        # CRITICAL: Convert from Log -> Real Dollars
         predicted_value = math.exp(log_value)
 
         # 4. Get Database Stats
