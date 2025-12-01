@@ -2,11 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { Briefcase, GraduationCap, Clock, BrainCircuit, Search, Sparkles, TrendingUp } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 
-// Use relative path so it works on Vercel
 const API_BASE_URL = '/api';
 
 export default function SalaryPredictor() {
-  // --- STATE ---
   const [formData, setFormData] = useState({
     job_title: '',
     years_experience: 2,
@@ -19,7 +17,6 @@ export default function SalaryPredictor() {
   const [result, setResult] = useState(null);
   const [insights, setInsights] = useState('');
 
-  // --- EFFECTS ---
   useEffect(() => {
     fetch(`${API_BASE_URL}/jobs`)
       .then(res => res.json())
@@ -32,7 +29,6 @@ export default function SalaryPredictor() {
       .catch(err => console.error("Backend offline? Ensure server is running.", err));
   }, []);
 
-  // --- HANDLERS ---
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -83,7 +79,6 @@ export default function SalaryPredictor() {
     }
   };
 
-  // --- RENDER ---
   return (
     <div className="min-h-screen bg-slate-50 p-6 font-sans text-slate-900">
       <div className="max-w-5xl mx-auto space-y-8">
@@ -158,7 +153,6 @@ export default function SalaryPredictor() {
                   <option value="Bachelor's">Bachelor&apos;s Degree</option>
                   <option value="Master's">Master&apos;s Degree</option>
                   <option value="PhD">PhD</option>
-                  <option value="High School">High School</option>
                 </select>
               </div>
 
