@@ -1,10 +1,10 @@
 {
-  "model_type": "linear",
-  "intercept": 1488.1637574690394,
+  "model_type": "log_linear",
+  "intercept": 10.330395807687026,
   "coefficients": {
-    "experience": 1951.6259766092778,
-    "education": 0.06738195653413181,
-    "job": 0.7231812749692511
+    "experience": 0.02092595002547665,
+    "education": 1.1880303998504865e-07,
+    "job": 8.247531488586817e-06
   },
   "mappings": {
     "education": {
