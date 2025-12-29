@@ -3,61 +3,36 @@ import csv
 import os
 import requests
 import math
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI
 from pydantic import BaseModel
 
 
-GENAI_API_KEY = os.getenv("GEMINI_API_KEY", "") 
+app = FastAPI()
+GENAI_KEY = os.getenv("GEMINI_API_KEY")
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-app = FastAPI(docs_url="/api/docs", openapi_url="/api/openapi.json")
+weight_path = os.path.join(os.path.dirname(BASE_DIR), 'model_weights.json')
+data_path = os.path.join(os.path.dirname(BASE_DIR), 'Salary Data.csv')
 
-current_dir = os.path.dirname(os.path.abspath(__file__))
-parent_dir = os.path.dirname(current_dir)
+if not os.path.exists(weight_path): weight_path = os.path.join(BASE_DIR, 'model_weights.json')
+if not os.path.exists(data_path): data_path = os.path.join(BASE_DIR, 'Salary Data.csv')
 
-def find_file(filename):
-    path = os.path.join(parent_dir, filename)
-    if os.path.exists(path): return path
-    return None
+with open(weight_path, 'r') as f:
+    model = json.load(f)
 
-MODEL_PATH = find_file('model_weights.json')
-DATA_PATH = find_file('Salary Data.csv')
-
-model_data = None
 raw_data = []
+with open(data_path, mode='r', encoding='utf-8') as f:
+    reader = csv.DictReader(f)
+    for row in reader:
+        # Try/Except removed: Malformed rows will now raise an error
+        raw_data.append({
+            'title': row['Job Title'],
+            'salary': float(row['Salary']),
+            'edu': row['Education Level']
+        })
 
-# 1. Load the Model
-if MODEL_PATH:
-    try:
-        with open(MODEL_PATH, 'r') as f:
-            model_data = json.load(f)
-    except Exception as e:
-        print(f"Error loading model: {e}")
-else:
-    print(f"CRITICAL: model_weights.json not found in {current_dir} or {parent_dir}")
 
-# 2. Load Data for RAG
-if DATA_PATH:
-    try:
-        with open(DATA_PATH, mode='r', encoding='utf-8') as csvfile:
-            reader = csv.DictReader(csvfile)
-            for row in reader:
-                try:
-                    clean_row = {
-                        'Job Title': row['Job Title'],
-                        'Education Level': row['Education Level'],
-                        'Salary': float(row['Salary']),
-                        'Years of Experience': float(row['Years of Experience'])
-                    }
-                    raw_data.append(clean_row)
-                except (ValueError, KeyError):
-                    continue 
-    except Exception as e:
-        print(f"Error loading data: {e}")
-else:
-    print(f"WARNING: Salary Data.csv not found.")
-
-# --- DATA MODELS ---
-class PredictionRequest(BaseModel):
+class Inputs(BaseModel):
     years_experience: float
     education_level: str
     job_title: str
@@ -67,135 +42,68 @@ class InsightsRequest(BaseModel):
     predicted_salary: float
     years_experience: float
 
-# --- ROUTES ---
 
 @app.get("/api/jobs")
 def get_jobs():
-    if not model_data: 
-        return [f"Error: Model not loaded."]
-    return model_data.get('job_list', [])
+    return model.get('job_list', [])
 
 @app.post("/api/predict")
-def predict_salary(req: PredictionRequest):
-    if not model_data: 
-        raise HTTPException(status_code=500, detail="Model weights missing on server")
-    
-    try:
-       
-        intercept = model_data['intercept']
-        coef = model_data['coefficients']
-        mappings = model_data['mappings']
-        defaults = model_data.get('defaults', {'job': 50000, 'education': 50000})
-
-       
-        edu_val = mappings['education'].get(req.education_level, defaults['education'])
-        job_val = mappings['job'].get(req.job_title, defaults['job'])
-
-        
-        if isinstance(coef.get('experience'), dict):
-             w_exp = coef['experience'].get('experience', 0) 
-        else:
-             w_exp = coef.get('experience', 0)
-        
-        w_edu = coef.get('education', 0) if not isinstance(coef.get('education'), dict) else 0
-        w_job = coef.get('job', 0) if not isinstance(coef.get('job'), dict) else 0
+def predict(req: Inputs):
+ 
+    c = model['coefficients']
+    m = model['mappings']
+    defaults = model['defaults']
 
  
-        w_exp = w_exp * 4.0 
+    edu_score = m['education'].get(req.education_level, defaults['education'])
+    job_score = m['job'].get(req.job_title, defaults['job'])
 
-        raw_value = intercept + \
-                         (req.years_experience * w_exp) + \
-                         (edu_val * w_edu) + \
-                         (job_val * w_job)
+  
+    log_val = model['intercept'] + \
+              (req.years_experience * c['experience'] * 4.0) + \
+              (edu_score * c['education']) + \
+              (job_score * c['job'])
 
-    
-        if intercept < 100:
-            try:
-                predicted_value = math.exp(raw_value)
-            except OverflowError:
-                predicted_value = 100000 # Safety fallback
-        else:
-            predicted_value = raw_value
-
-      
-        salaries = [r['Salary'] for r in raw_data if r['Job Title'] == req.job_title]
-        
-        if salaries:
-            mean_salary = sum(salaries) / len(salaries)
-            count = len(salaries)
-        else:
-            mean_salary = 0
-            count = 0
-        
-        return {
-            "predicted_salary": round(predicted_value, 2),
-            "currency": "USD",
-            "database_stats": {
-                "mean": round(mean_salary, 2),
-                "count": count
-            }
-        }
-    except Exception as e:
-      
-        raise HTTPException(status_code=500, detail=f"Math Error: {str(e)}")
-
-@app.post("/api/rag-insights")
-def get_insights(req: InsightsRequest):
-    if not GENAI_API_KEY:
-        return {"insights": "API Key not configured."}
-
-    # 1. Prepare Context
-    relevant_rows = [r for r in raw_data if r['Job Title'] == req.job_title]
-    
-    if not relevant_rows:
-        context = "No specific data found in database."
-    else:
-        salaries = [r['Salary'] for r in relevant_rows]
-        experiences = [r['Years of Experience'] for r in relevant_rows]
-        
-        avg_sal = sum(salaries) / len(salaries)
-        max_sal = max(salaries)
-        avg_exp = sum(experiences) / len(experiences)
-        
-        context = f"Database Data: Average Salary: ${avg_sal:,.0f}, Max Salary: ${max_sal:,.0f}, Avg Experience: {avg_exp:.1f} years."
-
-    # 2. Create Prompt
-    prompt_text = f"""
-    Act as a concise career coach.
-    Role: {req.job_title} ({req.years_experience} years exp).
-    Predicted Salary: ${req.predicted_salary:,.2f}.
-    Market Data: {context}
-    
-    Provide a quick 3-point analysis:
-    1. **Salary Verdict**: Is this fair? (Compare to market data briefly).
-    2. **Top 3 Skills**: What specific skills will raise this salary?
-    3. **Next Steps**: A one-sentence encouraging summary.
-    
-    Keep it simple, professional, and under 150 words. Use Markdown formatting.
-    """
+ 
+    pred_salary = math.exp(log_val)
 
    
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={GENAI_API_KEY}"
-    
-    payload = {
-        "contents": [{
-            "parts": [{"text": prompt_text}]
-        }]
+    matches = [r['salary'] for r in raw_data if r['title'] == req.job_title]
+    avg_salary = sum(matches) / len(matches) if matches else 0
+
+    return {
+        "predicted_salary": round(pred_salary, 2),
+        "database_stats": {"mean": round(avg_salary, 2), "count": len(matches)}
     }
+
+@app.post("/api/rag-insights")
+def insights(req: InsightsRequest):
+  
+    matches = [r for r in raw_data if r['title'] == req.job_title]
     
-    try:
-        response = requests.post(url, json=payload)
-        
-        if response.status_code == 429:
-             return {"insights": "Usage limit reached. Please wait a minute and try again."}
-             
-        data = response.json()
-        
-        if "candidates" in data and data["candidates"]:
-            return {"insights": data["candidates"][0]["content"]["parts"][0]["text"]}
-        else:
-            error_msg = data.get('error', {}).get('message', 'Unknown AI error')
-            return {"insights": f"AI Response Error: {error_msg}"}
-            
-    except Exception as e:
-        return {"insights": f"Connection Error: {str(e)}"}
+    if matches:
+        sals = [r['salary'] for r in matches]
+        context = f"Database stats for {req.job_title}: Avg ${sum(sals)/len(sals):,.0f}, Range ${min(sals):,.0f}-${max(sals):,.0f}."
+    else:
+        context = "No historical data found for this specific role."
+
+    
+    prompt = f"""
+    Act as a career strategist.
+    User: {req.job_title} ({req.years_experience} YOE).
+    Prediction: ${req.predicted_salary:,.0f}.
+    Market Context: {context}
+
+    Give 3 concise bullet points:
+    1. Salary Fairness Verdict
+    2. One Key Skill to learn to boost this number
+    3. One Strategic Move for the next 12 months
+    """
+
+    
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GENAI_KEY}"
+    response = requests.post(url, json={"contents": [{"parts": [{"text": prompt}]}]})
+    
+    if response.status_code == 200:
+        return {"insights": response.json()["candidates"][0]["content"]["parts"][0]["text"]}
+    return {"insights": "AI service currently unavailable."}
