@@ -16,7 +16,7 @@ parent_dir = os.path.dirname(current_dir)
 
 def find_file(filename):
     path = os.path.join(parent_dir, filename)
-    if os.path.exists(path2): return path2
+    if os.path.exists(path): return path
     return None
 
 MODEL_PATH = find_file('model_weights.json')
