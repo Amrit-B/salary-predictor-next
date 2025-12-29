@@ -15,11 +15,7 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 parent_dir = os.path.dirname(current_dir)
 
 def find_file(filename):
-    # 1. Check inside api/
-    path1 = os.path.join(current_dir, filename)
-    if os.path.exists(path1): return path1
-    # 2. Check in root
-    path2 = os.path.join(parent_dir, filename)
+    path = os.path.join(parent_dir, filename)
     if os.path.exists(path2): return path2
     return None
 
