@@ -93,7 +93,7 @@ def insights(req: InsightsRequest):
     3. One Strategic Move for the next 12 months
     """
 
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GENAI_KEY}"
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key={GENAI_KEY}"
     
     try:
         response = requests.post(url, json={"contents": [{"parts": [{"text": prompt}]}]})
