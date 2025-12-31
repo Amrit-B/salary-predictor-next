@@ -12,7 +12,7 @@
 
 # testing
 /coverage
-
+/server.py
 # next.js
 /.next/
 /out/

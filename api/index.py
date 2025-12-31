@@ -6,7 +6,6 @@ import math
 from fastapi import FastAPI
 from pydantic import BaseModel
 
-
 app = FastAPI()
 GENAI_KEY = os.getenv("GEMINI_API_KEY")
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -24,12 +23,12 @@ raw_data = []
 with open(data_path, mode='r', encoding='utf-8') as f:
     reader = csv.DictReader(f)
     for row in reader:
-        raw_data.append({
-            'title': row['Job Title'],
-            'salary': float(row['Salary']),
-            'edu': row['Education Level']
-        })
-
+        if row['Salary'] and row['Salary'].strip():
+            raw_data.append({
+                'title': row['Job Title'],
+                'salary': float(row['Salary']),
+                'edu': row['Education Level']
+            })
 
 class Inputs(BaseModel):
     years_experience: float
@@ -41,32 +40,26 @@ class InsightsRequest(BaseModel):
     predicted_salary: float
     years_experience: float
 
-
 @app.get("/api/jobs")
 def get_jobs():
     return model.get('job_list', [])
 
 @app.post("/api/predict")
 def predict(req: Inputs):
- 
     c = model['coefficients']
     m = model['mappings']
     defaults = model['defaults']
 
- 
     edu_score = m['education'].get(req.education_level, defaults['education'])
     job_score = m['job'].get(req.job_title, defaults['job'])
 
-  
     log_val = model['intercept'] + \
               (req.years_experience * c['experience'] * 4.0) + \
               (edu_score * c['education']) + \
               (job_score * c['job'])
 
- 
     pred_salary = math.exp(log_val)
 
-   
     matches = [r['salary'] for r in raw_data if r['title'] == req.job_title]
     avg_salary = sum(matches) / len(matches) if matches else 0
 
@@ -77,7 +70,6 @@ def predict(req: Inputs):
 
 @app.post("/api/rag-insights")
 def insights(req: InsightsRequest):
-  
     matches = [r for r in raw_data if r['title'] == req.job_title]
     
     if matches:
@@ -86,7 +78,6 @@ def insights(req: InsightsRequest):
     else:
         context = "No historical data found for this specific role."
 
-    
     prompt = f"""
     Act as a career strategist.
     User: {req.job_title} ({req.years_experience} YOE).
@@ -99,7 +90,6 @@ def insights(req: InsightsRequest):
     3. One Strategic Move for the next 12 months
     """
 
-    
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GENAI_KEY}"
     response = requests.post(url, json={"contents": [{"parts": [{"text": prompt}]}]})
     
