@@ -70,6 +70,9 @@ def predict(req: Inputs):
 
 @app.post("/api/rag-insights")
 def insights(req: InsightsRequest):
+    if not GENAI_KEY:
+        return {"insights": "Configuration Error: GEMINI_API_KEY is missing."}
+
     matches = [r for r in raw_data if r['title'] == req.job_title]
     
     if matches:
@@ -91,8 +94,16 @@ def insights(req: InsightsRequest):
     """
 
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GENAI_KEY}"
-    response = requests.post(url, json={"contents": [{"parts": [{"text": prompt}]}]})
     
-    if response.status_code == 200:
-        return {"insights": response.json()["candidates"][0]["content"]["parts"][0]["text"]}
-    return {"insights": "AI service currently unavailable."}
+    try:
+        response = requests.post(url, json={"contents": [{"parts": [{"text": prompt}]}]})
+        
+        if response.status_code == 200:
+            return {"insights": response.json()["candidates"][0]["content"]["parts"][0]["text"]}
+        else:
+            print(f"Gemini API Error: {response.status_code} - {response.text}")
+            return {"insights": f"AI unavailable (Error {response.status_code}). Please check server logs."}
+            
+    except Exception as e:
+        print(f"Connection Error: {e}")
+        return {"insights": "AI service connection failed."}
