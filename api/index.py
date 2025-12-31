@@ -24,7 +24,6 @@ raw_data = []
 with open(data_path, mode='r', encoding='utf-8') as f:
     reader = csv.DictReader(f)
     for row in reader:
-        # Try/Except removed: Malformed rows will now raise an error
         raw_data.append({
             'title': row['Job Title'],
             'salary': float(row['Salary']),
