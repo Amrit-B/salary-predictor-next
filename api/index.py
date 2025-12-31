@@ -87,10 +87,15 @@ def insights(req: InsightsRequest):
     Prediction: ${req.predicted_salary:,.0f}.
     Market Context: {context}
 
-    Give 3 concise bullet points:
-    1. Salary Fairness Verdict
-    2. One Key Skill to learn to boost this number
-    3. One Strategic Move for the next 12 months
+    Provide a quick 3-point analysis:
+
+    1. **Salary Verdict**: Is this fair? (Compare to market data briefly).
+
+    2. **Top 3 Skills**: What specific skills will raise this salary?
+
+    3. **Next Steps**: A one-sentence encouraging summary.
+
+    Keep it simple, professional, and under 150 words. Use Markdown formatting.
     """
 
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={GENAI_KEY}"
